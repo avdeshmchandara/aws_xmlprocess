@@ -1,0 +1,286 @@
+{
+  "Comment": "State Machine to process files",
+  "StartAt": "ValidateFileFormat",
+  "TimeoutSeconds": 3600,
+  "States": {
+    "ValidateFileFormat": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-2:613640794830:function:medpro-dev-ds-validate-file-format-lambda",
+      "ResultPath": "$",
+      "Next": "Index File?"
+    },
+    "Index File?": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.fileType",
+          "StringEquals": "Index",
+          "Next": "ProcessIndexFiles"
+        },
+        {
+          "Variable": "$.fileType",
+          "StringEquals": "UNSUPPORTED",
+          "Next": "UnSupportedFileFormat"
+        }
+      ],
+      "Default": "UpdateStatusToInprogress"
+    },
+    "UpdateStatusToInprogress": {
+      "Type": "Task",
+      "Parameters": {
+        "Execution.$": "$$.Execution.Id",
+        "status": "IN_PROGRESS",
+        "fileName.$": "$.fileName",
+        "sourceBucket.$": "$.sourceBucket",
+        "fileType.$": "$.fileType",
+		"errorBucket.$" : "$.errorBucket"
+      },
+	  "ResultPath": "$",
+      "Resource": "arn:aws:lambda:us-east-2:613640794830:function:medpro-dev-ds-doc-process-status-indexing-lambda",
+      "Next": "ProcessFiles"
+    },
+    "ProcessFiles": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.fileType",
+          "StringEquals": "TIFF",
+          "Next": "KickTextract"
+        },
+        {
+          "Variable": "$.fileType",
+          "StringEquals": "TIF",
+          "Next": "KickTextract"
+        },
+        {
+          "Variable": "$.fileType",
+          "StringEquals": "DOC",
+          "Next": "DocToTxt"
+        },
+        {
+          "Variable": "$.fileType",
+          "StringEquals": "DOCX",
+          "Next": "DocxToTxt"
+        },
+		{
+          "Variable": "$.fileType",
+          "StringEquals": "DSUS",
+          "Next": "DsusToPdf"
+        },
+        {
+          "Variable": "$.fileType",
+          "StringEquals": "DOCM",
+          "Next": "DocmToTxt"
+        },
+        {
+          "Variable": "$.fileType",
+          "StringEquals": "HTML",
+          "Next": "HtmlToTxt"
+        },
+		{
+          "Variable": "$.fileType",
+          "StringEquals": "HNLF",
+          "Next": "HnlfToPdf"
+        },
+        {
+          "Variable": "$.fileType",
+          "StringEquals": "HTM",
+          "Next": "HtmlToTxt"
+        },
+        {
+          "Variable": "$.fileType",
+          "StringEquals": "MSG",
+          "Next": "MsgToTxt"
+        },
+        {
+          "Variable": "$.fileType",
+          "StringEquals": "PNG",
+          "Next": "KickTextract"
+        },
+        {
+          "Variable": "$.fileType",
+          "StringEquals": "JPEG",
+          "Next": "KickTextract"
+        },
+        {
+          "Variable": "$.fileType",
+          "StringEquals": "JPG",
+          "Next": "KickTextract"
+        },
+        {
+          "Variable": "$.fileType",
+          "StringEquals": "PDF",
+          "Next": "KickTextract"
+        },
+        {
+          "Variable": "$.fileType",
+          "StringEquals": "TXT",
+          "Next": "PlainTextFile"
+        },
+        {
+          "Variable": "$.fileType",
+          "StringEquals": "TEXT",
+          "Next": "PlainTextFile"
+        },
+        {
+          "Variable": "$.fileType",
+          "StringEquals": "JSON",
+          "Next": "PlainTextFile"
+        },
+        {
+          "Variable": "$.fileType",
+          "StringEquals": "CSV",
+          "Next": "PlainTextFile"
+        }
+      ]
+    },
+    "UnSupportedFileFormat": {
+      "Type": "Succeed"
+    },
+    "ProcessIndexFiles": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-2:613640794830:function:medpro-dev-ds-process-indexfile-lambda",
+      "End": true
+    },
+    "DocToTxt": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-2:613640794830:function:medpro-dev-ds-convert-doc-to-txt-lambda",
+	  "ResultPath": "$",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "UpdateStatusToFailed",
+          "ResultPath": "$.error"
+        }],
+      "Next": "sqs-update-es-text"
+    },
+    "DocxToTxt": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-2:613640794830:function:medpro-dev-ds-convert-docx-to-txt-lambda",
+      "ResultPath": "$",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "UpdateStatusToFailed",
+          "ResultPath": "$.error"
+        }],
+      "Next": "sqs-update-es-text"
+    },
+	"DocmToTxt": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-2:613640794830:function:medpro-dev-ds-convert-docm-to-txt-lambda",
+      "ResultPath": "$",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "UpdateStatusToFailed",
+          "ResultPath": "$.error"
+        }],
+      "Next": "sqs-update-es-text"
+    },
+	"DsusToPdf": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-2:613640794830:function:medpro-dev-ds-convert-dsus-to-pdf-lambda",
+      "ResultPath": "$",
+      "Catch": [
+            {
+            "ErrorEquals": ["States.ALL"],
+            "Next": "UpdateStatusToFailed",
+            "ResultPath": "$.error"
+         } ],
+      "End": true
+    },	
+    "HtmlToTxt": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-2:613640794830:function:medpro-dev-ds-convert-html-to-txt-lambda",
+	  "ResultPath": "$",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "UpdateStatusToFailed",
+          "ResultPath": "$.error"
+        }],
+      "Next": "sqs-update-es-text"
+    },
+	"HnlfToPdf": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-2:613640794830:function:medpro-dev-ds-convert-hnlf-to-pdf-lambda",
+      "ResultPath": "$",
+      "Catch": [
+            {
+            "ErrorEquals": ["States.ALL"],
+            "Next": "UpdateStatusToFailed",
+            "ResultPath": "$.error"
+         } ],
+      "End": true
+    },		
+	"PlainTextFile": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-2:613640794830:function:medpro-dev-ds-move-plain-text-file-lambda",
+      "ResultPath": "$",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "UpdateStatusToFailed",
+          "ResultPath": "$.error"
+        }],
+      "Next": "sqs-update-es-text"
+    },
+    "MsgToTxt": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-2:613640794830:function:medpro-dev-ds-convert-msg-to-txt-lambda",
+      "ResultPath": "$",
+      "Catch": [
+        {
+          "ErrorEquals": [ "States.ALL" ],
+          "Next": "UpdateStatusToFailed",
+          "ResultPath": "$.error"
+        }],
+     "Next": "sqs-update-es-text"
+    },
+    "sqs-update-es-text": {
+      "Type": "Task",
+      "ResultPath": "$.output",
+      "Resource": "arn:aws:states:::sqs:sendMessage",
+      "Parameters": {
+        "QueueUrl": "https://sqs.us-east-2.amazonaws.com/613640794830/medpro-dev-ds-update-es-text",
+        "MessageBody.$": "$" 
+      },
+      "End": true
+    },
+	
+    "KickTextract": {
+      "Type": "Task",
+      "Parameters": {
+        "Execution.$": "$$.Execution.Id",
+        "fileName.$": "$.fileName",
+        "sourceBucket.$": "$.sourceBucket"
+      },
+      "Resource": "arn:aws:lambda:us-east-2:613640794830:function:medpro-dev-ds-s3-processor-lambda",
+      "ResultPath": null,
+      "Catch": [
+            {
+            "ErrorEquals": ["States.ALL"],
+            "Next": "UpdateStatusToFailed",
+            "ResultPath": "$.error"
+         } ],
+      "End": true
+    },	
+    "UpdateStatusToFailed": {
+      "Type": "Task",
+      "Parameters": {
+        "Execution.$": "$$.Execution.Id",
+        "status": "FAILED",
+        "fileName.$": "$.fileName",
+        "sourceBucket.$": "$.sourceBucket",
+        "errorMsg.$": "$.error"
+      },
+      "Resource": "arn:aws:lambda:us-east-2:613640794830:function:medpro-dev-ds-doc-process-status-indexing-lambda",
+      "ResultPath": null,
+      "Next": "ReportFailureState"
+    },
+    "ReportFailureState": {
+      "Type": "Fail"
+    }
+  }
+}
